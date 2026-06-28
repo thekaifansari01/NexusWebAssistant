@@ -1,8 +1,8 @@
 import { CONFIG } from './config.js';
-import { state, updateState } from '../state.js';
+import { state, updateState } from './state.js';
 import { addMessage, showTyping } from './dom.js';
 import { getCachedData, setCachedData } from './cache.js';
-import { scrapePageAdvanced, formatForAIAdvanced } from '../scraper.js';
+import { scrapePageAdvanced, formatForAIAdvanced } from './scraper.js';
 
 const MAX_HISTORY = 10;
 

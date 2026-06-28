@@ -55,7 +55,7 @@
 Add this single script tag to your website:
 
 ```html
-<script defer src="https://cdn.jsdelivr.net/gh/thekaifansari01/NexusWebAssistant@main/dist/nexus-assistant.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/nexus-web-assistant/dist/nexus-assistant.min.js"></script>
 ```
 
 ### **Option 2: Self-Hosted**
