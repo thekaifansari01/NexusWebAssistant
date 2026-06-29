@@ -11,10 +11,30 @@ function getGreeting() {
   return window.__NEXUS_CONFIG?.GREETING || CONFIG.GREETING;
 }
 
+// ------------------- Render Markdown (Moved to top) ---------
+function renderMarkdown(text) {
+  if (!text) return '';
+  try {
+    if (typeof marked !== 'undefined' && marked.parse) {
+      return marked.parse(text, { breaks: true, gfm: true });
+    }
+  } catch (e) {
+    console.warn('Markdown parse failed:', e);
+  }
+  return text.replace(/\n/g, '<br>');
+}
+
+// ------------------- Auto-resize textarea ---------
+function autoResize(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+}
+
 // ------------------- Widget HTML -------------------
 export function createWidget() {
   const botName = getBotName();
   const greeting = getGreeting();
+  const greetingHtml = renderMarkdown(greeting);
 
   const root = document.createElement('div');
   root.id = 'ai-widget-root';
@@ -25,36 +45,69 @@ export function createWidget() {
           <span class="status-dot"></span>
           ${botName}
         </div>
-        <button class="ai-close-btn" id="aiCloseBtn" aria-label="Close chat">
-          <i class="fas fa-xmark"></i>
-        </button>
+        <div class="ai-header-actions">
+          <button class="ai-theme-toggle" id="aiThemeToggle" aria-label="Toggle theme">
+            <i class="fas fa-moon"></i>
+          </button>
+          <button class="ai-close-btn" id="aiCloseBtn" aria-label="Close chat">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
       </div>
       <div class="ai-messages" id="aiMessages">
         <div class="msg bot">
-          ${greeting}
+          ${greetingHtml}
         </div>
       </div>
       <div class="ai-input-area" id="aiInputArea">
         <div id="aiPreviewContainer"></div>
         <div class="ai-input-container">
-          <button class="icon-btn" id="aiAttachBtn" aria-label="Attach image">
+          <button class="icon-btn" id="aiAttachBtn" aria-label="Attach image or file">
             <i class="fas fa-paperclip"></i>
           </button>
-          <input type="text" id="aiInput" placeholder="Message..." autocomplete="off">
+          <textarea 
+            id="aiInput" 
+            placeholder="Message..." 
+            rows="1"
+            autocomplete="off"
+            spellcheck="true"
+          ></textarea>
           <button class="icon-btn send-btn" id="aiSendBtn">
             <i class="fas fa-arrow-up"></i>
           </button>
+        </div>
+        <div class="ai-input-footer">
+          <span class="ai-char-count" id="aiCharCount">0</span>
         </div>
       </div>
     </div>
     <button class="ai-fab" id="aiFab" aria-label="Open AI Chat">
       <span class="bot-icon">
-        <i class="fas fa-robot" style="color: #000000 !important; font-size: 22px;"></i>
+        <i class="fas fa-robot" style="color: #ffffff !important; font-size: 22px;"></i>
       </span>
     </button>
   `;
   document.body.appendChild(root);
+  
+  const textarea = getEl('aiInput');
+  if (textarea) {
+    textarea.addEventListener('input', () => {
+      autoResize(textarea);
+      updateCharCount(textarea);
+    });
+  }
+  
   return root;
+}
+
+// ------------------- Update character count ---------
+function updateCharCount(textarea) {
+  const count = getEl('aiCharCount');
+  if (count) {
+    const len = textarea.value.length;
+    count.textContent = len > 0 ? `${len}` : '0';
+    count.style.color = len > 500 ? '#ef4444' : '#a0a0a0';
+  }
 }
 
 // ------------------- Panel toggle -------------------
@@ -63,17 +116,12 @@ export function togglePanel(panel, open) {
   const isOpen = (open !== undefined) ? open : !panel.classList.contains('open');
   panel.classList.toggle('open', isOpen);
   if (isOpen) {
-    setTimeout(() => getEl('aiInput')?.focus(), 100);
+    setTimeout(() => {
+      const input = getEl('aiInput');
+      if (input) input.focus();
+    }, 100);
   }
   return isOpen;
-}
-
-// ------------------- Render Markdown -------------------
-function renderMarkdown(text) {
-  if (typeof marked !== 'undefined' && marked.parse) {
-    return marked.parse(text, { breaks: true, gfm: true });
-  }
-  return text.replace(/\n/g, '<br>');
 }
 
 // ------------------- Add message bubble -------------------
@@ -124,22 +172,70 @@ export function showTyping(container, show) {
   }
 }
 
-// ------------------- Image preview pill -------------------
+// ------------------- Enhanced Preview -------------------
 export function showPreview(container, file) {
   if (!container) return;
   container.innerHTML = '';
   if (!file) return;
 
+  const isImage = file.type?.startsWith('image/') || file.dataUrl?.startsWith('data:image');
+  const isPDF = file.type === 'application/pdf' || file.name?.endsWith('.pdf');
+  const isDoc = file.type?.includes('document') || file.name?.endsWith('.docx') || file.name?.endsWith('.txt');
+
   const pill = document.createElement('div');
   pill.className = 'image-preview-pill';
+
+  let icon = 'fa-file';
+  let bgColor = 'rgba(255,255,255,0.04)';
+  
+  if (isImage) {
+    icon = 'fa-image';
+    bgColor = 'rgba(255,255,255,0.04)';
+  } else if (isPDF) {
+    icon = 'fa-file-pdf';
+    bgColor = 'rgba(255,255,255,0.04)';
+  } else if (isDoc) {
+    icon = 'fa-file-lines';
+    bgColor = 'rgba(255,255,255,0.04)';
+  }
+
   pill.innerHTML = `
-    <img src="${file.dataUrl}" alt="preview">
-    <span class="file-name">${file.name}</span>
-    <button class="remove-file" id="aiRemoveFile"><i class="fas fa-times"></i></button>
+    ${isImage ? `<img src="${file.dataUrl}" alt="preview" class="preview-thumb">` : `<i class="fas ${icon}" style="font-size: 20px; color: #888;"></i>`}
+    <span class="file-name">${file.name || 'file'}</span>
+    <span class="file-size">${formatFileSize(file.size || 0)}</span>
+    <button class="remove-file" id="aiRemoveFile" aria-label="Remove file">
+      <i class="fas fa-times"></i>
+    </button>
   `;
+  pill.style.background = bgColor;
   container.appendChild(pill);
 
   document.getElementById('aiRemoveFile')?.addEventListener('click', () => {
-    // handled externally
+    container.innerHTML = '';
+    const event = new CustomEvent('file-removed');
+    document.dispatchEvent(event);
   });
+}
+
+// ------------------- File size formatter ---------
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ------------------- Clear input ---------
+export function clearInput() {
+  const input = getEl('aiInput');
+  if (input) {
+    input.value = '';
+    input.style.height = 'auto';
+    updateCharCount(input);
+  }
+}
+
+// ------------------- Set input focus ---------
+export function focusInput() {
+  const input = getEl('aiInput');
+  if (input) input.focus();
 }

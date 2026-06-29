@@ -5,7 +5,16 @@ export const CONFIG = {
   MODEL: 'meta-llama/llama-4-scout-17b-16e-instruct',
 
   BOT_NAME: "Nexus AI",
-  GREETING: "Hey! I'm Nexus AI, your intelligent assistant. Ask me anything about this page!",
+  
+  GREETING: `👋 Hey there! I'm **Nexus AI** – your smart assistant for this page.
+
+Ask me anything about the content you see here. I can:
+• 📖 Summarize articles
+• 🔍 Find specific details
+• 📊 Explain tables and data
+• 💡 Answer questions instantly
+
+Just type your question below and I'll do my best to help! 🚀`,
 
   SYSTEM_PROMPT: `
 You are Nexus AI, a smart assistant. Use the page context provided in every response.
@@ -18,6 +27,10 @@ You are Nexus AI, a smart assistant. Use the page context provided in every resp
 - If information is not in context, politely say so and offer to help with related topics.
 - Keep responses concise (under 600 tokens).
   `,
+
+
+  MAX_FILE_SIZE: 5 * 1024 * 1024, 
+  ALLOWED_FILE_TYPES: ['image/*', 'application/pdf', 'text/*', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
 
   COLORS: {
     bg: '#0a0a0a',
