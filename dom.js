@@ -3,8 +3,19 @@ import { CONFIG } from './config.js';
 // ------------------- Helpers -------------------
 export const getEl = (id) => document.getElementById(id);
 
+// ------------------- Helper to get dynamic config ---------
+function getBotName() {
+  return window.__NEXUS_CONFIG?.BOT_NAME || CONFIG.BOT_NAME;
+}
+function getGreeting() {
+  return window.__NEXUS_CONFIG?.GREETING || CONFIG.GREETING;
+}
+
 // ------------------- Widget HTML -------------------
 export function createWidget() {
+  const botName = getBotName();
+  const greeting = getGreeting();
+
   const root = document.createElement('div');
   root.id = 'ai-widget-root';
   root.innerHTML = `
@@ -12,7 +23,7 @@ export function createWidget() {
       <div class="ai-header">
         <div class="ai-header-title">
           <span class="status-dot"></span>
-          ${CONFIG.BOT_NAME}
+          ${botName}
         </div>
         <button class="ai-close-btn" id="aiCloseBtn" aria-label="Close chat">
           <i class="fas fa-xmark"></i>
@@ -20,7 +31,7 @@ export function createWidget() {
       </div>
       <div class="ai-messages" id="aiMessages">
         <div class="msg bot">
-          ${CONFIG.GREETING}
+          ${greeting}
         </div>
       </div>
       <div class="ai-input-area" id="aiInputArea">
@@ -129,9 +140,6 @@ export function showPreview(container, file) {
   container.appendChild(pill);
 
   document.getElementById('aiRemoveFile')?.addEventListener('click', () => {
-    // The removal logic will be handled in the main module (index.js)
-    // We dispatch a custom event or just let the caller handle it.
-    // For simplicity, we'll just call a cleanup function passed as a callback.
-    // But to keep it decoupled, we'll return the pill element so the caller can attach events.
+    // handled externally
   });
 }

@@ -7,6 +7,23 @@ import { getCacheInfo, clearAllCache } from './cache.js';
 import { loadScraperLibraries, watchForChanges } from './scraper.js';
 
 // ============================================================
+// MERGE USER CONFIG WITH DEFAULT
+// ============================================================
+function getMergedConfig() {
+  const userConfig = window.NexusConfig || {};
+  
+  return {
+    API_URL: CONFIG.API_URL,  // Fixed
+    API_KEY: userConfig.apiKey || CONFIG.API_KEY,
+    MODEL: userConfig.model || CONFIG.MODEL,
+    BOT_NAME: userConfig.botName || CONFIG.BOT_NAME,
+    GREETING: userConfig.greeting || CONFIG.GREETING,
+    SYSTEM_PROMPT: userConfig.systemPrompt || CONFIG.SYSTEM_PROMPT,
+    COLORS: CONFIG.COLORS
+  };
+}
+
+// ============================================================
 // LOAD CDN RESOURCES (Including Scraper Libraries)
 // ============================================================
 async function loadCDN() {
@@ -47,6 +64,10 @@ async function loadCDN() {
 // MAIN INIT
 // ============================================================
 async function init() {
+  // Merge and store config globally
+  const config = getMergedConfig();
+  window.__NEXUS_CONFIG = config;
+
   await loadCDN();
   injectStyles();
   createWidget();

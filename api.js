@@ -12,20 +12,6 @@ state.conversationHistory = [
 ];
 
 // ============================================================
-// Get Page Context (with cache)
-// ============================================================
-function getPageContext() {
-  // Check cache first
-  const cached = getCachedData(); // Note: getCachedData is async, but we'll handle inside sendMessageToAI
-  // Actually we need to handle async properly. We'll make getPageContext async.
-  // But we'll rewrite as async function.
-  // We'll change to async inside sendMessageToAI.
-  // For simplicity, we'll create an async function.
-}
-
-// We'll implement refreshPageContext and getPageContext as async.
-
-// ============================================================
 // Get Page Context (async)
 // ============================================================
 async function getPageContextAsync() {
@@ -92,11 +78,14 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
     // Get page context
     const pageContext = await getPageContextAsync();
     
+    // Get merged config
+    const config = window.__NEXUS_CONFIG || CONFIG;
+
     // Build messages for API
     const messages = [
       { 
         role: 'system', 
-        content: `${CONFIG.SYSTEM_PROMPT}\n\n## Current Page Context\n${pageContext}`
+        content: `${config.SYSTEM_PROMPT}\n\n## Current Page Context\n${pageContext}`
       }
     ];
     
@@ -111,14 +100,14 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
     // Add current user message with multimodal content
     messages.push({ role: 'user', content: userContent });
 
-    const response = await fetch(CONFIG.API_URL, {
+    const response = await fetch(config.API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${CONFIG.API_KEY}`
+        'Authorization': `Bearer ${config.API_KEY}`
       },
       body: JSON.stringify({
-        model: CONFIG.MODEL,
+        model: config.MODEL,
         messages: messages,
         temperature: 0.7,
         max_tokens: 600,

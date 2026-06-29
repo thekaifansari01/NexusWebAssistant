@@ -1,16 +1,12 @@
-// ============================================================
-// CONFIGURATION
-// ============================================================
 export const CONFIG = {
   API_URL: 'https://api.groq.com/openai/v1/chat/completions',
-  API_KEY: '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',
+  API_KEY: '',  
+  
   MODEL: 'meta-llama/llama-4-scout-17b-16e-instruct',
 
-  // ===== BRANDING =====
   BOT_NAME: "Nexus AI",
-  GREETING: "Hey! I'm Nexus AI, your intelligent assistant. Ask me anything about Website!",
+  GREETING: "Hey! I'm Nexus AI, your intelligent assistant. Ask me anything about this page!",
 
-  // ===== SYSTEM PROMPT (Generic, context‑driven) =====
   SYSTEM_PROMPT: `
 You are Nexus AI, a smart assistant. Use the page context provided in every response.
 
@@ -23,7 +19,6 @@ You are Nexus AI, a smart assistant. Use the page context provided in every resp
 - Keep responses concise (under 600 tokens).
   `,
 
-  // ===== MONOCHROME PALETTE =====
   COLORS: {
     bg: '#0a0a0a',
     panelBg: 'rgba(12, 12, 12, 0.85)',
