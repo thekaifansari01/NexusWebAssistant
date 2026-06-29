@@ -1,19 +1,15 @@
-import { CONFIG } from './config.js';
-import { state, updateState } from './state.js';
-import { addMessage, showTyping } from './dom.js';
-import { getCachedData, setCachedData } from './cache.js';
-import { scrapePageAdvanced, formatForAIAdvanced } from './scraper.js';
+import { CONFIG } from '../core/config.js';
+import { state, updateState } from '../core/state.js';
+import { addMessage, showTyping } from '../ui/dom.js';        
+import { getCachedData, setCachedData } from '../utils/cache.js';
+import { scrapePageAdvanced, formatForAIAdvanced } from '../scraper/scraper.js';
 
 const MAX_HISTORY = 10;
 
-// Initialise conversation history with system prompt
 state.conversationHistory = [
   { role: 'system', content: CONFIG.SYSTEM_PROMPT }
 ];
 
-// ============================================================
-// Get Page Context (async)
-// ============================================================
 async function getPageContextAsync() {
   let cached = await getCachedData();
   if (cached) {
@@ -29,9 +25,6 @@ async function getPageContextAsync() {
   return context;
 }
 
-// ============================================================
-// Refresh Page Context (force fresh scrape)
-// ============================================================
 export async function refreshPageContext() {
   console.log('🔄 Forcing page context refresh...');
   const pageData = scrapePageAdvanced();
@@ -41,9 +34,6 @@ export async function refreshPageContext() {
   return context;
 }
 
-// ============================================================
-// Send Message to AI (with page context)
-// ============================================================
 export async function sendMessageToAI(container, userText, imageDataUrl = null) {
   if (state.isProcessing) return;
   updateState({ isProcessing: true });
@@ -55,7 +45,6 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
 
   showTyping(container, true);
 
-  // Build user content
   const userContent = [];
   if (userText) userContent.push({ type: 'text', text: userText });
   if (imageDataUrl) {
@@ -65,9 +54,7 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
     });
   }
 
-  // Update history (user message)
   state.conversationHistory.push({ role: 'user', content: userText || '(image)' });
-  // Trim history
   if (state.conversationHistory.length > MAX_HISTORY + 1) {
     const system = state.conversationHistory[0];
     const recent = state.conversationHistory.slice(-MAX_HISTORY);
@@ -75,29 +62,24 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
   }
 
   try {
-    // Get page context
     const pageContext = await getPageContextAsync();
     
-    // Get merged config
     const config = window.__NEXUS_CONFIG || CONFIG;
 
-    // Build messages for API
     const messages = [
       { 
         role: 'system', 
         content: `${config.SYSTEM_PROMPT}\n\n## Current Page Context\n${pageContext}`
       }
     ];
-    
-    // Add conversation history (excluding system)
+  
     for (let i = 1; i < state.conversationHistory.length - 1; i++) {
       messages.push({
         role: state.conversationHistory[i].role,
         content: state.conversationHistory[i].content
       });
     }
-    
-    // Add current user message with multimodal content
+   
     messages.push({ role: 'user', content: userContent });
 
     const response = await fetch(config.API_URL, {

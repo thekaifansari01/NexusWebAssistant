@@ -1,10 +1,10 @@
-import { CONFIG } from './config.js';
-import { injectStyles } from './styles.js';
-import { createWidget, getEl, togglePanel, addMessage, showTyping, showPreview } from './dom.js';
-import { sendMessageToAI, refreshPageContext } from './api.js';
-import { state, updateState } from './state.js';
-import { getCacheInfo, clearAllCache } from './cache.js';
-import { loadScraperLibraries, watchForChanges } from './scraper.js';
+import { CONFIG } from './src/core/config.js';
+import { injectStyles } from './src/ui/styles.js';         
+import { createWidget, getEl, togglePanel, addMessage, showTyping, showPreview } from './src/ui/dom.js';  
+import { sendMessageToAI, refreshPageContext } from './src/api/api.js';
+import { state, updateState } from './src/core/state.js';
+import { getCacheInfo, clearAllCache } from './src/utils/cache.js';
+import { loadScraperLibraries, watchForChanges } from './src/scraper/scraper.js';
 
 // ============================================================
 // MERGE USER CONFIG WITH DEFAULT
