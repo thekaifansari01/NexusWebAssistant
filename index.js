@@ -1,28 +1,22 @@
 import { CONFIG } from './src/core/config.js';
-import { injectStyles } from './src/ui/styles.js';         
-import { createWidget, getEl, togglePanel, addMessage, showTyping, showPreview } from './src/ui/dom.js';  
-import { sendMessageToAI, refreshPageContext } from './src/api/api.js';
+import { injectStyles } from './src/ui/styles.js';
+import { createWidget, getEl, togglePanel, addMessage, showTyping, showPreview } from './src/ui/dom.js';
+import { sendMessageToAI, refreshPageContext, loadHistoryFromLocal, clearHistoryLocal } from './src/api/api.js';
 import { state, updateState } from './src/core/state.js';
-import { getCacheInfo, clearAllCache } from './src/utils/cache.js';
+import { getCacheInfo } from './src/utils/cache.js';
 import { loadScraperLibraries, watchForChanges } from './src/scraper/scraper.js';
 
-// ============================================================
-// DETECT WEBSITE THEME
-// ============================================================
 function detectWebsiteTheme() {
-  // 1. Check user config override
   const userConfig = window.NexusConfig || {};
   if (userConfig.theme) {
-    return userConfig.theme; // 'dark' or 'light'
+    return userConfig.theme;
   }
 
-  // 2. Check localStorage (user preference)
   const saved = localStorage.getItem('nexus-theme');
   if (saved) {
     return saved;
   }
 
-  // 3. Check body class
   const body = document.body;
   if (body.classList.contains('dark') || body.classList.contains('dark-theme') || body.classList.contains('dark-mode')) {
     return 'dark';
@@ -31,42 +25,34 @@ function detectWebsiteTheme() {
     return 'light';
   }
 
-  // 4. Check data-theme attribute
   const html = document.documentElement;
   const dataTheme = html.getAttribute('data-theme');
   if (dataTheme === 'dark' || dataTheme === 'light') {
     return dataTheme;
   }
 
-  // 5. Check meta theme-color
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) {
     const color = metaTheme.content;
-    // Simple heuristic: dark colors = '#000', '#1a1a1a', etc.
     if (color.startsWith('#') && parseInt(color.slice(1, 3), 16) < 100) {
       return 'dark';
     }
   }
 
-  // 6. Check system preference
   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     return 'dark';
   }
 
-  // 7. Default: dark
   return 'dark';
 }
 
-// ============================================================
-// MERGE USER CONFIG WITH DEFAULT
-// ============================================================
 function getMergedConfig() {
   const userConfig = window.NexusConfig || {};
   const detectedTheme = detectWebsiteTheme();
   
   return {
-    API_URL: CONFIG.API_URL,                     // Proxy URL from config.js
-    API_KEY: userConfig.apiKey || CONFIG.API_KEY, // Nexus key
+    API_URL: CONFIG.API_URL,
+    API_KEY: userConfig.apiKey || CONFIG.API_KEY,
     MODEL: userConfig.model || CONFIG.MODEL,
     BOT_NAME: userConfig.botName || CONFIG.BOT_NAME,
     GREETING: userConfig.greeting || CONFIG.GREETING,
@@ -76,9 +62,6 @@ function getMergedConfig() {
   };
 }
 
-// ============================================================
-// TOGGLE THEME
-// ============================================================
 export function toggleTheme() {
   const root = document.getElementById('ai-widget-root');
   if (!root) return;
@@ -104,9 +87,6 @@ export function toggleTheme() {
   console.log(`🌓 Theme switched to: ${newTheme}`);
 }
 
-// ============================================================
-// LOAD CDN RESOURCES
-// ============================================================
 async function loadCDN() {
   const fa = document.createElement('link');
   fa.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css';
@@ -136,9 +116,13 @@ async function loadCDN() {
   await loadScraperLibraries();
 }
 
-// ============================================================
-// MAIN INIT
-// ============================================================
+function abortOngoingRequest() {
+  if (state.abortController) {
+    state.abortController.abort();
+    updateState({ abortController: null });
+  }
+}
+
 async function init() {
   const config = getMergedConfig();
   window.__NEXUS_CONFIG = config;
@@ -169,6 +153,24 @@ async function init() {
   const attachBtn = getEl('aiAttachBtn');
   const previewContainer = getEl('aiPreviewContainer');
 
+  const clearBtn = getEl('aiClearBtn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      if (confirm('Clear all chat messages?')) {
+        messagesContainer.innerHTML = '';
+        const greeting = getGreeting();
+        const greetingHtml = renderMarkdown(greeting);
+        const greetDiv = document.createElement('div');
+        greetDiv.className = 'msg bot';
+        greetDiv.innerHTML = greetingHtml;
+        messagesContainer.appendChild(greetDiv);
+        state.conversationHistory = [{ role: 'system', content: config.SYSTEM_PROMPT }];
+        clearHistoryLocal();
+        updateState({ lastUserMessage: null, lastBotMessageEl: null, lastErrorMessageEl: null });
+      }
+    });
+  }
+
   watchForChanges(() => {
     console.log('🔄 Page changed, refreshing context...');
     refreshPageContext();
@@ -177,7 +179,8 @@ async function init() {
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
-  fileInput.accept = 'image/*';
+  const allowedTypes = CONFIG.ALLOWED_FILE_TYPES || ['image/*'];
+  fileInput.accept = allowedTypes.join(',');
   fileInput.style.display = 'none';
   fileInput.id = 'aiFileInput';
   document.body.appendChild(fileInput);
@@ -187,16 +190,27 @@ async function init() {
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file.');
+
+    const isValidType = allowedTypes.some(type => {
+      if (type.endsWith('/*')) {
+        const prefix = type.slice(0, -2);
+        return file.type.startsWith(prefix);
+      }
+      return file.type === type || file.name.endsWith(type.slice(1));
+    });
+
+    if (!isValidType) {
+      alert('Please select a valid file type.');
       return;
     }
+
     const reader = new FileReader();
     reader.onload = (ev) => {
       const attachedFile = {
         dataUrl: ev.target.result,
         name: file.name,
-        type: file.type
+        type: file.type,
+        size: file.size
       };
       updateState({ attachedFile });
       showPreview(previewContainer, attachedFile);
@@ -219,16 +233,18 @@ async function init() {
     updateState({ isOpen });
   });
 
-  closeBtn?.addEventListener('click', () => {
+  function closePanel() {
+    abortOngoingRequest();
     const isOpen = togglePanel(panel, false);
     updateState({ isOpen });
-  });
+  }
+
+  closeBtn?.addEventListener('click', closePanel);
 
   document.addEventListener('click', (e) => {
     const rootEl = document.getElementById('ai-widget-root');
     if (rootEl && state.isOpen && !rootEl.contains(e.target)) {
-      const isOpen = togglePanel(panel, false);
-      updateState({ isOpen });
+      closePanel();
     }
   });
 
@@ -238,13 +254,11 @@ async function init() {
     if (state.isProcessing) return;
 
     const image = state.attachedFile?.dataUrl || null;
-    addMessage(messagesContainer, text, 'user', image);
-
+    const fileData = state.attachedFile?.dataUrl || null;
+    updateState({ attachedFile: null, lastUserMessage: { text, image: fileData } });
     input.value = '';
     input.style.height = 'auto';
     showPreview(previewContainer, null);
-    const fileData = state.attachedFile?.dataUrl || null;
-    updateState({ attachedFile: null });
 
     sendMessageToAI(messagesContainer, text, fileData);
   };
@@ -257,9 +271,68 @@ async function init() {
     }
   });
 
+  document.addEventListener('regenerate-request', (e) => {
+    const { messageEl } = e.detail;
+    if (!messageEl) return;
+    if (state.isProcessing) return;
+
+    const history = state.conversationHistory;
+    const lastBotIndex = history.length - 1;
+    if (lastBotIndex < 0 || history[lastBotIndex].role !== 'assistant') return;
+    const lastUserIndex = lastBotIndex - 1;
+    if (lastUserIndex < 0 || history[lastUserIndex].role !== 'user') return;
+
+    const userMsg = history[lastUserIndex];
+    const userText = userMsg.content;
+
+    history.pop();
+    messageEl.remove();
+    if (state.lastBotMessageEl === messageEl) {
+      updateState({ lastBotMessageEl: null });
+    }
+
+    sendMessageToAI(messagesContainer, userText, null, { skipUserAdd: true });
+  });
+
+  // ---- Load saved history WITHOUT removing the greeting ----
+  const savedHistory = loadHistoryFromLocal();
+  if (savedHistory && savedHistory.length > 0) {
+    // Greeting already exists in the container, we keep it.
+    // Reset conversation history (keep system prompt)
+    state.conversationHistory = [{ role: 'system', content: config.SYSTEM_PROMPT }];
+    // Add saved messages after the greeting
+    savedHistory.forEach(entry => {
+      if (entry.role === 'user') {
+        addMessage(messagesContainer, entry.content, 'user');
+      } else if (entry.role === 'assistant') {
+        const el = addMessage(messagesContainer, entry.content, 'bot', null, { withRegenerate: true });
+        if (el && entry === savedHistory[savedHistory.length - 1]) {
+          updateState({ lastBotMessageEl: el });
+        }
+      }
+      state.conversationHistory.push(entry);
+    });
+  }
+
   const info = await getCacheInfo();
   console.log('📊 Cache Stats:', info || 'No cache yet');
   console.log('✨ Nexus AI v2.0 initialized with theme:', config.THEME);
+}
+
+function getGreeting() {
+  return window.__NEXUS_CONFIG?.GREETING || CONFIG.GREETING;
+}
+
+function renderMarkdown(text) {
+  if (!text) return '';
+  try {
+    if (typeof marked !== 'undefined' && marked.parse) {
+      return marked.parse(text, { breaks: true, gfm: true });
+    }
+  } catch (e) {
+    console.warn('Markdown parse failed:', e);
+  }
+  return text.replace(/\n/g, '<br>');
 }
 
 if (document.readyState === 'loading') {

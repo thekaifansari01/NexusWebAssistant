@@ -1,15 +1,6 @@
-// ============================================================
-// ADVANCED SCRAPER ENGINE v2.0
-// Uses Readability + Turndown + JSON-LD
-// ============================================================
-
-// Global references (loaded from CDN)
 let Readability = null;
 let TurndownService = null;
 
-// ============================================================
-// Load Libraries (called from main init)
-// ============================================================
 export async function loadScraperLibraries() {
   const libs = {
     readability: 'https://cdnjs.cloudflare.com/ajax/libs/readability/0.4.4/Readability.min.js',
@@ -38,9 +29,6 @@ function loadScript(src) {
   });
 }
 
-// ============================================================
-// MAIN SCRAPER ENGINE
-// ============================================================
 export function scrapePageAdvanced() {
   console.log('🕷️ Advanced scraping started...');
   
@@ -56,7 +44,6 @@ export function scrapePageAdvanced() {
     metadata: {}
   };
 
-  // 1. Extract Readability Content (Clean main content)
   try {
     if (Readability) {
       const documentClone = document.cloneNode(true);
@@ -68,11 +55,10 @@ export function scrapePageAdvanced() {
           title: article.title,
           byline: article.byline,
           excerpt: article.excerpt,
-          content: article.content, // HTML string
+          content: article.content,
           textContent: article.textContent
         };
         
-        // Convert to Markdown
         if (TurndownService) {
           const turndown = new TurndownService({
             headingStyle: 'atx',
@@ -81,7 +67,6 @@ export function scrapePageAdvanced() {
             bulletListMarker: '-'
           });
           
-          // Custom rules for better markdown
           turndown.addRule('strikethrough', {
             filter: ['del', 's', 'strike'],
             replacement: function(content) {
@@ -100,7 +85,6 @@ export function scrapePageAdvanced() {
     data.readability = null;
   }
 
-  // 2. Extract Structured Data (JSON-LD)
   try {
     const scripts = document.querySelectorAll('script[type="application/ld+json"]');
     scripts.forEach(script => {
@@ -113,10 +97,8 @@ export function scrapePageAdvanced() {
     console.warn('JSON-LD extraction failed:', error);
   }
 
-  // 3. Extract Meta & OG Tags
   data.metadata = extractMetadata();
 
-  // 4. If Readability fails, use fallback
   if (!data.readability) {
     console.log('⚠️ Using fallback scraper');
     const fallbackData = scrapeFallback();
@@ -124,16 +106,12 @@ export function scrapePageAdvanced() {
     data.summary = fallbackData.summary;
   }
 
-  // 5. Enhanced summary with AI-friendly formatting
   data.aiContext = formatForAIAdvanced(data);
 
   console.log('✅ Advanced scraping complete');
   return data;
 }
 
-// ============================================================
-// Detect Page Type
-// ============================================================
 function detectPageType() {
   const url = window.location.href;
   const title = document.title.toLowerCase();
@@ -154,47 +132,36 @@ function detectPageType() {
   return 'general';
 }
 
-// ============================================================
-// Extract Metadata
-// ============================================================
 function extractMetadata() {
   const meta = {};
   
-  // Standard meta
   const desc = document.querySelector('meta[name="description"]');
   if (desc) meta.description = desc.content;
   
   const keywords = document.querySelector('meta[name="keywords"]');
   if (keywords) meta.keywords = keywords.content;
   
-  // Open Graph
   const og = ['title', 'description', 'image', 'url', 'type', 'site_name'];
   og.forEach(key => {
     const el = document.querySelector(`meta[property="og:${key}"]`);
     if (el) meta[`og_${key}`] = el.content;
   });
   
-  // Twitter Cards
   const tw = ['card', 'title', 'description', 'image'];
   tw.forEach(key => {
     const el = document.querySelector(`meta[name="twitter:${key}"]`);
     if (el) meta[`twitter_${key}`] = el.content;
   });
   
-  // Canonical URL
   const canonical = document.querySelector('link[rel="canonical"]');
   if (canonical) meta.canonical = canonical.href;
   
   return meta;
 }
 
-// ============================================================
-// FALLBACK SCRAPER (if Readability fails)
-// ============================================================
 function scrapeFallback() {
   const clone = document.body.cloneNode(true);
   
-  // Remove junk
   const removeSelectors = [
     'nav', 'header', 'footer', 'aside', 
     '.sidebar', '.navigation', '.menu', '.ads',
@@ -205,29 +172,22 @@ function scrapeFallback() {
     clone.querySelectorAll(selector).forEach(el => el.remove());
   });
   
-  // Convert to text
   let content = clone.textContent || '';
   content = content.replace(/\s+/g, ' ').trim();
   
-  // Generate summary
   const summary = content.substring(0, 500) + '...';
   
   return { content, summary };
 }
 
-// ============================================================
-// FORMAT FOR AI (Advanced)
-// ============================================================
 export function formatForAIAdvanced(data) {
   let context = '';
   
-  // 1. Page Header
   context += `# 📄 ${data.title}\n\n`;
   context += `**URL:** ${data.url}\n`;
   context += `**Type:** ${data.pageType}\n`;
   context += `**Scraped:** ${new Date(data.timestamp).toLocaleString()}\n\n`;
   
-  // 2. Metadata
   if (Object.keys(data.metadata).length > 0) {
     context += `## 📋 Metadata\n`;
     for (const [key, value] of Object.entries(data.metadata)) {
@@ -238,7 +198,6 @@ export function formatForAIAdvanced(data) {
     context += '\n';
   }
   
-  // 3. Structured Data (Rich snippets)
   if (data.structuredData && data.structuredData.length > 0) {
     context += `## 📊 Structured Data (Schema.org)\n`;
     data.structuredData.forEach((item, index) => {
@@ -248,10 +207,8 @@ export function formatForAIAdvanced(data) {
     context += '\n';
   }
   
-  // 4. Main Content (Markdown)
   if (data.markdown) {
     context += `## 📝 Main Content\n\n`;
-    // Limit to 4000 chars to save tokens
     const maxLength = 4000;
     const content = data.markdown.length > maxLength 
       ? data.markdown.substring(0, maxLength) + '... (truncated)'
@@ -260,27 +217,21 @@ export function formatForAIAdvanced(data) {
     context += '\n\n';
   }
   
-  // 5. Summary
   if (data.summary) {
     context += `## 📌 Summary\n\n`;
     context += data.summary;
     context += '\n\n';
   }
   
-  // 6. AI Instructions
   context += `---\n`;
   context += `*🤖 AI Instructions: Use this context to answer user questions about this page. Be precise, reference specific details from the content, and maintain a friendly professional tone.*\n`;
   
   return context;
 }
 
-// ============================================================
-// DYNAMIC CONTENT WATCHER (For SPA)
-// ============================================================
 export function watchForChanges(callback) {
   let lastUrl = window.location.href;
   
-  // Watch for URL changes (SPA navigation)
   const observer = new MutationObserver(() => {
     if (window.location.href !== lastUrl) {
       lastUrl = window.location.href;
@@ -289,26 +240,20 @@ export function watchForChanges(callback) {
     }
   });
   
-  observer.observe(document, { subtree: true, childList: true });
+  observer.observe(document.body, { childList: true, subtree: false });
   
-  // Also watch for pushState/popState
-  const originalPushState = history.pushState;
-  history.pushState = function() {
-    originalPushState.apply(this, arguments);
+  window.addEventListener('popstate', () => {
     setTimeout(() => {
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         callback();
       }
-    }, 500);
-  };
+    }, 100);
+  });
   
   return observer;
 }
 
-// ============================================================
-// SMART EXTRACT - Get specific elements
-// ============================================================
 export function extractSpecificData() {
   const data = {
     headings: [],
@@ -317,7 +262,6 @@ export function extractSpecificData() {
     tables: []
   };
   
-  // Headings with hierarchy
   document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(h => {
     data.headings.push({
       level: parseInt(h.tagName[1]),
@@ -325,7 +269,6 @@ export function extractSpecificData() {
     });
   });
   
-  // Links (with context)
   document.querySelectorAll('a[href]').forEach(a => {
     const href = a.href;
     if (href && !href.startsWith('javascript:') && !href.startsWith('#')) {
@@ -336,7 +279,6 @@ export function extractSpecificData() {
     }
   });
   
-  // Images
   document.querySelectorAll('img[src]').forEach(img => {
     data.images.push({
       src: img.src,
@@ -345,7 +287,6 @@ export function extractSpecificData() {
     });
   });
   
-  // Tables
   document.querySelectorAll('table').forEach(table => {
     const rows = [];
     table.querySelectorAll('tr').forEach(tr => {

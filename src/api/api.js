@@ -1,6 +1,6 @@
 import { CONFIG } from '../core/config.js';
 import { state, updateState } from '../core/state.js';
-import { addMessage, showTyping } from '../ui/dom.js';        
+import { addMessage, showTyping } from '../ui/dom.js';
 import { getCachedData, setCachedData } from '../utils/cache.js';
 import { scrapePageAdvanced, formatForAIAdvanced } from '../scraper/scraper.js';
 
@@ -34,14 +34,20 @@ export async function refreshPageContext() {
   return context;
 }
 
-export async function sendMessageToAI(container, userText, imageDataUrl = null) {
+export async function sendMessageToAI(container, userText, imageDataUrl = null, options = {}) {
   if (state.isProcessing) return;
+  const { skipUserAdd = false, onError = null } = options;
   updateState({ isProcessing: true });
 
   const sendBtn = document.getElementById('aiSendBtn');
   const input = document.getElementById('aiInput');
   if (sendBtn) sendBtn.disabled = true;
   if (input) input.disabled = true;
+
+  if (!skipUserAdd) {
+    state.lastUserMessage = { text: userText, image: imageDataUrl };
+    addMessage(container, userText, 'user', imageDataUrl);
+  }
 
   showTyping(container, true);
 
@@ -54,16 +60,24 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
     });
   }
 
-  state.conversationHistory.push({ role: 'user', content: userText || '(image)' });
-  if (state.conversationHistory.length > MAX_HISTORY + 1) {
-    const system = state.conversationHistory[0];
-    const recent = state.conversationHistory.slice(-MAX_HISTORY);
-    state.conversationHistory = [system, ...recent];
+  if (!skipUserAdd) {
+    state.conversationHistory.push({ role: 'user', content: userText || '(image)' });
+    if (state.conversationHistory.length > MAX_HISTORY + 1) {
+      const system = state.conversationHistory[0];
+      const recent = state.conversationHistory.slice(-MAX_HISTORY);
+      state.conversationHistory = [system, ...recent];
+    }
+    saveHistoryToLocal();
   }
+
+  const controller = new AbortController();
+  updateState({ abortController: controller });
+
+  let errorOccurred = false;
+  let errorMessage = '';
 
   try {
     const pageContext = await getPageContextAsync();
-    
     const config = window.__NEXUS_CONFIG || CONFIG;
 
     const messages = [
@@ -82,15 +96,15 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
    
     messages.push({ role: 'user', content: userContent });
 
-    // ✅ PROXY REQUEST – Nexus Key, Origin header
     const response = await fetch(config.API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Origin': window.location.origin  // Domain validation ke liye
+        'Origin': window.location.origin
       },
+      signal: controller.signal,
       body: JSON.stringify({
-        nexusKey: config.API_KEY,          // Nexus key (NOT Groq key)
+        nexusKey: config.API_KEY,
         messages: messages,
         model: config.MODEL
       })
@@ -102,24 +116,82 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
     }
 
     const data = await response.json();
-    // Proxy returns same structure as Groq API
     const botReply = data.choices?.[0]?.message?.content || "Sorry, I didn't understand that.";
     state.conversationHistory.push({ role: 'assistant', content: botReply });
+    saveHistoryToLocal();
 
     showTyping(container, false);
-    addMessage(container, botReply, 'bot');
+    const botEl = addMessage(container, botReply, 'bot', null, { withRegenerate: true });
+    if (botEl) {
+      updateState({ lastBotMessageEl: botEl });
+    }
+
+    state.lastErrorMessageEl = null;
 
   } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('Request aborted by user');
+      return;
+    }
     console.error('Nexus Proxy Error:', error);
+    errorOccurred = true;
+    errorMessage = error.message || 'Something went wrong.';
     showTyping(container, false);
-    addMessage(container, `⚠️ Oops! ${error.message || 'Something went wrong.'} Please try again.`, 'bot');
+    const errorText = `⚠️ Oops! ${errorMessage} Please try again.`;
+    const errorEl = addMessage(container, errorText, 'bot', null, {
+      isError: true,
+      errorCallback: () => {
+        if (state.lastErrorMessageEl) {
+          state.lastErrorMessageEl.remove();
+          state.lastErrorMessageEl = null;
+        }
+        const lastUser = state.lastUserMessage;
+        if (lastUser) {
+          sendMessageToAI(container, lastUser.text, lastUser.image, { skipUserAdd: true });
+        }
+      }
+    });
+    if (errorEl) {
+      updateState({ lastErrorMessageEl: errorEl });
+    }
+    if (onError) onError(error);
   } finally {
-    updateState({ isProcessing: false });
+    updateState({ isProcessing: false, abortController: null });
     if (sendBtn) sendBtn.disabled = false;
     if (input) {
       input.disabled = false;
-      input.value = '';
+      if (!errorOccurred) {
+        input.value = '';
+        input.style.height = 'auto';
+        const count = document.getElementById('aiCharCount');
+        if (count) {
+          count.textContent = '0';
+          count.style.color = '#a0a0a0';
+        }
+      }
       input.focus();
     }
   }
+}
+
+function saveHistoryToLocal() {
+  try {
+    const toSave = state.conversationHistory.slice(1);
+    localStorage.setItem('nexus-chat-history', JSON.stringify(toSave));
+  } catch (e) {}
+}
+
+export function loadHistoryFromLocal() {
+  try {
+    const raw = localStorage.getItem('nexus-chat-history');
+    if (!raw) return null;
+    const history = JSON.parse(raw);
+    return history;
+  } catch { return null; }
+}
+
+export function clearHistoryLocal() {
+  try {
+    localStorage.removeItem('nexus-chat-history');
+  } catch {}
 }

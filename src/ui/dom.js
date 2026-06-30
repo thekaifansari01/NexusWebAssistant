@@ -1,9 +1,8 @@
 import { CONFIG } from '../core/config.js';
+import { state } from '../core/state.js';
 
-// ------------------- Helpers -------------------
 export const getEl = (id) => document.getElementById(id);
 
-// ------------------- Helper to get dynamic config ---------
 function getBotName() {
   return window.__NEXUS_CONFIG?.BOT_NAME || CONFIG.BOT_NAME;
 }
@@ -11,7 +10,6 @@ function getGreeting() {
   return window.__NEXUS_CONFIG?.GREETING || CONFIG.GREETING;
 }
 
-// ------------------- Render Markdown (Moved to top) ---------
 function renderMarkdown(text) {
   if (!text) return '';
   try {
@@ -24,13 +22,16 @@ function renderMarkdown(text) {
   return text.replace(/\n/g, '<br>');
 }
 
-// ------------------- Auto-resize textarea ---------
 function autoResize(textarea) {
   textarea.style.height = 'auto';
   textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
 }
 
-// ------------------- Widget HTML -------------------
+function escapeHtml(text) {
+  if (!text) return '';
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export function createWidget() {
   const botName = getBotName();
   const greeting = getGreeting();
@@ -48,6 +49,9 @@ export function createWidget() {
         <div class="ai-header-actions">
           <button class="ai-theme-toggle" id="aiThemeToggle" aria-label="Toggle theme">
             <i class="fas fa-moon"></i>
+          </button>
+          <button class="ai-clear-btn" id="aiClearBtn" aria-label="Clear chat">
+            <i class="fas fa-trash"></i>
           </button>
           <button class="ai-close-btn" id="aiCloseBtn" aria-label="Close chat">
             <i class="fas fa-xmark"></i>
@@ -100,7 +104,6 @@ export function createWidget() {
   return root;
 }
 
-// ------------------- Update character count ---------
 function updateCharCount(textarea) {
   const count = getEl('aiCharCount');
   if (count) {
@@ -110,7 +113,6 @@ function updateCharCount(textarea) {
   }
 }
 
-// ------------------- Panel toggle -------------------
 export function togglePanel(panel, open) {
   if (!panel) return false;
   const isOpen = (open !== undefined) ? open : !panel.classList.contains('open');
@@ -124,9 +126,9 @@ export function togglePanel(panel, open) {
   return isOpen;
 }
 
-// ------------------- Add message bubble -------------------
-export function addMessage(container, text, sender = 'bot', imageDataUrl = null) {
+export function addMessage(container, text, sender = 'bot', imageDataUrl = null, options = {}) {
   if (!container) return null;
+  const { withRegenerate = false, isError = false, errorCallback = null } = options;
 
   const div = document.createElement('div');
   div.className = `msg ${sender}`;
@@ -139,12 +141,37 @@ export function addMessage(container, text, sender = 'bot', imageDataUrl = null)
         hljs.highlightElement(block);
       });
     }
+    if (withRegenerate) {
+      const regenBtn = document.createElement('button');
+      regenBtn.className = 'msg-regen-btn';
+      regenBtn.innerHTML = '<i class="fas fa-rotate-right"></i>';
+      regenBtn.title = 'Regenerate response';
+      regenBtn.setAttribute('aria-label', 'Regenerate');
+      regenBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const event = new CustomEvent('regenerate-request', { detail: { messageEl: div } });
+        document.dispatchEvent(event);
+      });
+      div.appendChild(regenBtn);
+    }
   } else {
-    let content = text || '';
+    const safeText = escapeHtml(text);
+    let content = safeText;
     if (imageDataUrl) {
       content += `<br><img src="${imageDataUrl}" class="image-preview" alt="attached">`;
     }
     div.innerHTML = content;
+  }
+
+  if (isError && errorCallback) {
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'msg-retry-btn';
+    retryBtn.innerHTML = '<i class="fas fa-redo"></i> Retry';
+    retryBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      errorCallback();
+    });
+    div.appendChild(retryBtn);
   }
 
   container.appendChild(div);
@@ -152,7 +179,6 @@ export function addMessage(container, text, sender = 'bot', imageDataUrl = null)
   return div;
 }
 
-// ------------------- Typing indicator -------------------
 let typingEl = null;
 
 export function showTyping(container, show) {
@@ -172,7 +198,6 @@ export function showTyping(container, show) {
   }
 }
 
-// ------------------- Enhanced Preview -------------------
 export function showPreview(container, file) {
   if (!container) return;
   container.innerHTML = '';
@@ -217,25 +242,8 @@ export function showPreview(container, file) {
   });
 }
 
-// ------------------- File size formatter ---------
 function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / 1048576).toFixed(1) + ' MB';
-}
-
-// ------------------- Clear input ---------
-export function clearInput() {
-  const input = getEl('aiInput');
-  if (input) {
-    input.value = '';
-    input.style.height = 'auto';
-    updateCharCount(input);
-  }
-}
-
-// ------------------- Set input focus ---------
-export function focusInput() {
-  const input = getEl('aiInput');
-  if (input) input.focus();
 }

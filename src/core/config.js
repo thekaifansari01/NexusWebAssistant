@@ -8,13 +8,7 @@ export const CONFIG = {
   
   GREETING: `👋 Hey there! I'm **Nexus AI** – your smart assistant for this page.
 
-Ask me anything about the content you see here. I can:
-• 📖 Summarize articles
-• 🔍 Find specific details
-• 📊 Explain tables and data
-• 💡 Answer questions instantly
-
-Just type your question below and I'll do my best to help! 🚀`,
+I can help you understand and find information from the content you see here. Just ask me anything about this page and I'll assist you instantly! 🚀`,
 
   SYSTEM_PROMPT: `
 You are Nexus AI, a smart assistant. Use the page context provided in every response.
@@ -27,7 +21,6 @@ You are Nexus AI, a smart assistant. Use the page context provided in every resp
 - If information is not in context, politely say so and offer to help with related topics.
 - Keep responses concise (under 600 tokens).
   `,
-
 
   MAX_FILE_SIZE: 5 * 1024 * 1024, 
   ALLOWED_FILE_TYPES: ['image/*', 'application/pdf', 'text/*', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
