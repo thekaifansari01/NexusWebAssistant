@@ -65,13 +65,13 @@ function getMergedConfig() {
   const detectedTheme = detectWebsiteTheme();
   
   return {
-    API_URL: CONFIG.API_URL,
-    API_KEY: userConfig.apiKey || CONFIG.API_KEY,
+    API_URL: CONFIG.API_URL,                     // Proxy URL from config.js
+    API_KEY: userConfig.apiKey || CONFIG.API_KEY, // Nexus key
     MODEL: userConfig.model || CONFIG.MODEL,
     BOT_NAME: userConfig.botName || CONFIG.BOT_NAME,
     GREETING: userConfig.greeting || CONFIG.GREETING,
     SYSTEM_PROMPT: userConfig.systemPrompt || CONFIG.SYSTEM_PROMPT,
-    THEME: detectedTheme, // Auto-detected or user override
+    THEME: detectedTheme,
     COLORS: CONFIG.COLORS
   };
 }
@@ -89,12 +89,10 @@ export function toggleTheme() {
   root.dataset.theme = newTheme;
   localStorage.setItem('nexus-theme', newTheme);
   
-  // Update global config
   if (window.__NEXUS_CONFIG) {
     window.__NEXUS_CONFIG.THEME = newTheme;
   }
 
-  // Update theme button icon
   const themeBtn = document.getElementById('aiThemeToggle');
   if (themeBtn) {
     themeBtn.innerHTML = newTheme === 'dark' 
@@ -149,13 +147,11 @@ async function init() {
   injectStyles();
   createWidget();
 
-  // Apply theme
   const root = document.getElementById('ai-widget-root');
   if (root) {
     root.dataset.theme = config.THEME || 'dark';
   }
 
-  // Theme toggle button
   const themeBtn = document.getElementById('aiThemeToggle');
   if (themeBtn) {
     const isDark = config.THEME === 'dark';

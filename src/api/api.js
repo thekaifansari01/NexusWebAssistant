@@ -82,27 +82,27 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
    
     messages.push({ role: 'user', content: userContent });
 
+    // ✅ PROXY REQUEST – Nexus Key, Origin header
     const response = await fetch(config.API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.API_KEY}`
+        'Origin': window.location.origin  // Domain validation ke liye
       },
       body: JSON.stringify({
-        model: config.MODEL,
+        nexusKey: config.API_KEY,          // Nexus key (NOT Groq key)
         messages: messages,
-        temperature: 0.7,
-        max_tokens: 600,
-        stream: false
+        model: config.MODEL
       })
     });
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      throw new Error(`API error ${response.status}: ${errData.error?.message || response.statusText}`);
+      throw new Error(`Proxy error ${response.status}: ${errData.error || response.statusText}`);
     }
 
     const data = await response.json();
+    // Proxy returns same structure as Groq API
     const botReply = data.choices?.[0]?.message?.content || "Sorry, I didn't understand that.";
     state.conversationHistory.push({ role: 'assistant', content: botReply });
 
@@ -110,7 +110,7 @@ export async function sendMessageToAI(container, userText, imageDataUrl = null) 
     addMessage(container, botReply, 'bot');
 
   } catch (error) {
-    console.error('Groq API Error:', error);
+    console.error('Nexus Proxy Error:', error);
     showTyping(container, false);
     addMessage(container, `⚠️ Oops! ${error.message || 'Something went wrong.'} Please try again.`, 'bot');
   } finally {

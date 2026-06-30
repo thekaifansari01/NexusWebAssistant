@@ -1,5 +1,5 @@
 export const CONFIG = {
-  API_URL: 'https://api.groq.com/openai/v1/chat/completions',
+  API_URL: 'https://trynexusweb.vercel.app/api/chat',
   API_KEY: '',  
   
   MODEL: 'meta-llama/llama-4-scout-17b-16e-instruct',
