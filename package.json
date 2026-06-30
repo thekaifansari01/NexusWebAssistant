@@ -1,6 +1,6 @@
 {
   "name": "nexus-web-assistant",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "AI-powered chatbot widget for any website",
   "main": "dist/nexus-assistant.min.js",
   "files": [
