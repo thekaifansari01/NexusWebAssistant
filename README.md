@@ -11,7 +11,7 @@
 - **Beautiful dark/light themes** – auto‑detects your site’s theme and adapts.
 - **CDN‑ready** – drop in a single `<script>` and you're live.
 
-➡️ [Live Demo](https://your-demo-link.com) · [GitHub](https://github.com/thekaifansari01/nexusWebAssistant/)
+➡️ [Live Demo](https://trynexusweb.vercel.app/demo) · [GitHub](https://github.com/thekaifansari01/nexusWebAssistant/)
 
 ---
 
